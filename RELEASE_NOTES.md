@@ -10,8 +10,18 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 - WebView cookie/session support for normal Stash login.
 - Stash display mode persistence for scene lists.
 - Fullscreen WebView video support.
+- Mobile playback transcode support for better remote streaming.
 - Custom Stash app icon.
 - Local Android bootstrap/build scripts.
+
+## Mobile Playback Update
+
+The latest local APK build defaults scene playback to Stash streaming transcodes instead of always requesting the original media file. This is intended for smoother playback over Tailscale when away from the local network.
+
+- Default playback target: `STANDARD_HD` / 720p.
+- Settings allow 720p, 480p, 1080p, or Original playback.
+- The wrapper rewrites Stash scene stream requests in the WebView only; it does not proxy traffic through a public service.
+- Stash and Tailscale remain private requirements.
 
 ## Security Notes
 
@@ -23,8 +33,12 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 
 ## Artifacts
 
+Latest local artifacts prepared on 2026-06-17:
+
 - `app-debug.apk`: sideloadable debug APK for immediate testing.
 - `Stash-Tailscale-web-UI-Android-app-source.zip`: clean project source archive.
+
+See `RELEASE_ARTIFACTS.md` for local paths and SHA-256 hashes.
 
 ## Phone Setup
 
