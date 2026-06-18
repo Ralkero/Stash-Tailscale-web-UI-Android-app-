@@ -1,6 +1,12 @@
-# Stash Tailscale Web UI Android App v1.2.0
+# Stash Tailscale Web UI Android App v1.3.0
 
 Private Android WebView wrapper for accessing Stash through Tailscale.
+
+## v1.3.0 Compact Menu Update
+
+- Changes the top-right Stash overflow menu from a large square grid to a narrow vertical list.
+- Keeps each destination's existing Stash icon and label in a compact, touch-friendly row.
+- Keeps utility actions grouped in a small footer below the destination list.
 
 ## v1.2.0 Navigation Update
 
@@ -41,8 +47,8 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 
 ## Artifacts
 
-- `Stash-Wrapper-v1.2.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
-- `Stash-Tailscale-web-UI-Android-app-v1.2.0-source.zip`: clean project source archive.
+- `Stash-Wrapper-v1.3.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
+- `Stash-Tailscale-web-UI-Android-app-v1.3.0-source.zip`: clean project source archive.
 - `SHA256SUMS.txt`: SHA-256 checksums for both release artifacts.
 
 ## Phone Setup

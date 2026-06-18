@@ -855,16 +855,16 @@ class MainActivity : Activity() {
                             border: 1px solid rgba(148, 163, 184, 0.35) !important;
                             border-radius: 6px !important;
                             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
-                            left: 0.65rem !important;
+                            left: auto !important;
                             margin: 0 !important;
                             max-height: calc(100vh - 5rem) !important;
                             overflow-y: auto !important;
-                            padding: 0.75rem !important;
+                            padding: 0.5rem !important;
                             pointer-events: auto !important;
                             position: fixed !important;
                             right: 0.65rem !important;
                             top: 4.1rem !important;
-                            width: auto !important;
+                            width: min(20rem, calc(100vw - 1.3rem)) !important;
                             z-index: 1041 !important;
                         }
 
@@ -872,11 +872,12 @@ class MainActivity : Activity() {
                             display: none !important;
                         }
 
-                        .top-nav .navbar-collapse .navbar-nav {
+                        .top-nav .navbar-collapse .navbar-nav:first-child {
                             align-items: stretch !important;
-                            display: grid !important;
-                            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                            gap: 0.5rem !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            flex-wrap: nowrap !important;
+                            gap: 0.2rem !important;
                             justify-content: stretch !important;
                             padding: 0 !important;
                             width: 100% !important;
@@ -892,15 +893,30 @@ class MainActivity : Activity() {
                             padding-top: 0.75rem !important;
                         }
 
-                        .top-nav .navbar-collapse .nav-link {
+                        .top-nav .navbar-collapse .navbar-nav:first-child > .nav-link {
+                            flex: 0 0 auto !important;
                             max-width: none !important;
                             width: 100% !important;
                         }
 
-                        .top-nav .navbar-collapse .nav-link > .btn {
-                            min-height: 4.5rem !important;
-                            padding: 0.75rem !important;
+                        .top-nav .navbar-collapse .navbar-nav:first-child > .nav-link > .btn {
+                            align-items: center !important;
+                            display: flex !important;
+                            flex-direction: row !important;
+                            font-size: 1rem !important;
+                            justify-content: flex-start !important;
+                            min-height: 3.25rem !important;
+                            padding: 0.6rem 0.75rem !important;
+                            text-align: left !important;
                             width: 100% !important;
+                        }
+
+                        .top-nav .navbar-collapse .navbar-nav:first-child .nav-menu-icon {
+                            flex: 0 0 auto !important;
+                            height: 1.5rem !important;
+                            margin: 0 0.85rem 0 0 !important;
+                            max-height: none !important;
+                            width: 1.5rem !important;
                         }
                     `;
                     document.head.appendChild(style);
