@@ -1,6 +1,6 @@
-# Stash Tailscale Web UI Android App
+# Android Stash Wrapper
 
-Private Android WebView wrapper for accessing a Stash server over Tailscale.
+Private Android WebView wrapper for the Stash instance reachable over Tailscale.
 
 Default server:
 
@@ -8,45 +8,95 @@ Default server:
 http://100.102.126.109:9999/
 ```
 
-## What this app does
-
-- Opens Stash as a normal Android app through a WebView.
-- Keeps access private through the external Tailscale Android app.
-- Provides bottom navigation for Scenes, Groups, Studios, Tags, and contextual Search.
-- Hides native controls by default; swipe down from the top to reveal Refresh, Status, Settings, and Logout.
-- Supports normal Stash login through WebView cookies.
-- Stores only the server URL. It does not store Stash passwords, API keys, or credentials.
-
 ## Security model
 
-- Tailscale must be connected on the phone.
-- No public Stash exposure is configured.
-- No router port forwarding is used.
+- Tailscale remains external and must be connected on the phone.
+- The app stores only the Stash server URL.
+- The app stores only one playback preference: whether to prefer Stash's lower-resolution stream endpoints.
+- It does not store Stash passwords, API keys, or cookies outside the normal Android WebView cookie store.
+- It does not use `addJavascriptInterface`.
 - The manifest requests only `android.permission.INTERNET`.
-- Cleartext HTTP is limited to the configured Tailscale IP.
+- Cleartext HTTP is allowed only for `100.102.126.109`; other custom servers must use HTTPS.
 
-## Local release artifacts
+## Mobile playback
 
-The prepared APK and clean source ZIP are documented in [`RELEASE_ARTIFACTS.md`](RELEASE_ARTIFACTS.md).
+Fresh installs default to Stash's original direct stream. Existing installs keep their saved playback preference during an update.
 
-## Build locally
+For slower remote connections, open the hidden toolbar, tap Settings, and enable "Prefer mobile playback transcodes." The wrapper selects Stash's native MP4 source directly inside its Video.js player instead of proxying video bytes through Android:
 
-From `android-stash-wrapper`:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\bootstrap-android-toolchain.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-debug.ps1
+```text
+/scene/<id>/stream.mp4?resolution=STANDARD_HD
 ```
 
-Debug APK output:
+The available settings are 480p, 720p, 1080p when Stash offers it, and Original. If a requested source is unavailable, Stash's normal source remains active. All traffic remains private inside Tailscale.
+
+Configure Stash's native transcode settings from this project:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\configure-stash-mobile-transcodes.ps1 -Apply
+```
+
+Queue a small validation job for one scene:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\configure-stash-mobile-transcodes.ps1 -Apply -GenerateSceneId 404
+```
+
+Queue the whole library only when the PC can run for a long time and you have enough disk space:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\configure-stash-mobile-transcodes.ps1 -Apply -GenerateAll
+```
+
+## Build
+
+After the Android command-line tools, SDK, JDK, and Gradle wrapper are available:
+
+```powershell
+.\gradlew.bat assembleDebug
+.\gradlew.bat lintDebug
+```
+
+If SDK package installation stops at license acceptance, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\accept-android-sdk-licenses.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\bootstrap-android-toolchain.ps1
+```
+
+Debug APK:
 
 ```text
 app\build\outputs\apk\debug\app-debug.apk
 ```
 
-## Phone setup
+## Private release APK
 
-1. Install and connect Tailscale on Android.
-2. Install the APK.
-3. Open Stash from the app.
-4. Log in with Stash normally.
+To create a local release keystore and signed APK without storing passwords in files:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-release.ps1
+```
+
+The script prompts for keystore/key passwords. The keystore is created under `signing\`, which is ignored by `.gitignore`.
+
+Release APK:
+
+```text
+app\build\outputs\apk\release\app-release.apk
+```
+
+## Phone install
+
+1. Install/open Tailscale on Android.
+2. Confirm the phone is connected to the same tailnet.
+3. Install the APK.
+4. Open the Stash app.
+5. Log in with Stash's normal login screen.
+
+## Runtime controls
+
+- `Refresh`: reloads the WebView.
+- `Status`: checks whether the Stash URL is reachable.
+- `Settings`: changes the server URL.
+- `Logout`: clears WebView cookies and reloads Stash.

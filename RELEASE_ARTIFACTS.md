@@ -1,50 +1,21 @@
 # Stash Tailscale Web UI Android App Release Artifacts
 
-Prepared locally on 2026-06-17.
+## v1.1.0
 
-## Latest local artifacts ready for GitHub Release upload
-
-- Debug APK: `C:\Users\jmswo\Documents\Codex\2026-06-16\create-a-windows-setup-package-for\android-stash-wrapper\release\20260617-124304\app-debug.apk`
-- Clean source ZIP: `C:\Users\jmswo\Documents\Codex\2026-06-16\create-a-windows-setup-package-for\android-stash-wrapper\release\20260617-124304\Stash-Tailscale-web-UI-Android-app-source.zip`
-
-## SHA-256
+- APK: `Stash-Wrapper-v1.1.0.apk`
+- Source: `Stash-Tailscale-web-UI-Android-app-v1.1.0-source.zip`
+- Checksums: `SHA256SUMS.txt`
 
 ```text
-0351F42BCC46922236F1360BE93423B16FB5B5817EF8E92852C409EFCEECE61C  app-debug.apk
-838F41C9DB3D0BDC4F5E3999ECDE74321C04AD8801820FE4642E7D89D410A4A0  Stash-Tailscale-web-UI-Android-app-source.zip
+5210471C5107B3A1A2531BC21C84D840749ABF7F148940CC890D12C4317D4FA8  Stash-Wrapper-v1.1.0.apk
+910E60F62F6EC86222CF56D468B22389A7D3DCD4F6C5CE8070DE2AA3EB15A439  Stash-Tailscale-web-UI-Android-app-v1.1.0-source.zip
 ```
 
-## Build notes
+The APK is an R8-optimized release build signed with the certificate used by v1.0.0, allowing an in-place update that preserves app data. The source archive excludes Android SDKs, build caches, generated output, screenshots, signing material, and local configuration.
 
-This build adds mobile playback transcode support in the Android wrapper:
+## Security
 
-- Intercepts Stash scene stream requests in the WebView.
-- Rewrites scene playback to Stash streaming transcode URLs by default.
-- Defaults to `STANDARD_HD` / 720p for lower bandwidth use away from the LAN.
-- Adds settings to choose 720p, 480p, 1080p, or Original playback.
-- Does not store Stash passwords, API keys, or credentials.
-
-## Excluded from source ZIP
-
-The clean source ZIP excludes generated/local tooling folders and secrets:
-
-- `.android-sdk/`
-- `.gradle/`
-- `.kotlin/`
-- `.tools/`
-- `app/build/`
-- `build/`
-- `release/`
-- `signing/`
-- `local.properties`
-- `*.jks`
-- `*.keystore`
-
-## Manual GitHub Release step
-
-Create or update a GitHub Release in this repository and upload the two artifacts above:
-
-1. `app-debug.apk`
-2. `Stash-Tailscale-web-UI-Android-app-source.zip`
-
-The current Codex GitHub connector can update repository text files but does not expose a release-asset upload endpoint. Use the local files listed above for the binary upload.
+- Stash remains reachable only through Tailscale.
+- No router forwarding or public exposure is configured.
+- No Stash credentials or signing passwords are included.
+- Android cleartext HTTP remains restricted to `100.102.126.109`.

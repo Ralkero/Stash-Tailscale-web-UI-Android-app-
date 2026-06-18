@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stash</string>
+    <string name="default_stash_url">http://100.102.126.109:9999/</string>
+</resources>
+

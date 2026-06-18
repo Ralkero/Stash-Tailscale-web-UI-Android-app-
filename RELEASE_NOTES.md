@@ -1,4 +1,4 @@
-# Stash Tailscale Web UI Android App
+# Stash Tailscale Web UI Android App v1.1.0
 
 Private Android WebView wrapper for accessing Stash through Tailscale.
 
@@ -10,18 +10,18 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 - WebView cookie/session support for normal Stash login.
 - Stash display mode persistence for scene lists.
 - Fullscreen WebView video support.
-- Mobile playback transcode support for better remote streaming.
 - Custom Stash app icon.
 - Local Android bootstrap/build scripts.
 
-## Mobile Playback Update
+## v1.1.0 Optimization Update
 
-The latest local APK build defaults scene playback to Stash streaming transcodes instead of always requesting the original media file. This is intended for smoother playback over Tailscale when away from the local network.
-
-- Default playback target: `STANDARD_HD` / 720p.
-- Settings allow 720p, 480p, 1080p, or Original playback.
-- The wrapper rewrites Stash scene stream requests in the WebView only; it does not proxy traffic through a public service.
-- Stash and Tailscale remain private requirements.
+- Fresh installs now use Stash's original direct stream by default; existing playback preferences are preserved.
+- Mobile 480p/720p playback uses Stash's native Video.js source selection without an Android byte proxy.
+- Repeated navigation uses Stash's SPA router with a full-load fallback.
+- Search focus and scene display synchronization perform fewer delayed injections.
+- Cookie persistence flushes when the app pauses instead of after every navigation.
+- WebView caching continues to honor Stash's HTTP cache headers so upgrades do not leave stale UI assets.
+- Release builds now use optimized R8 shrinking.
 
 ## Security Notes
 
@@ -33,12 +33,9 @@ The latest local APK build defaults scene playback to Stash streaming transcodes
 
 ## Artifacts
 
-Latest local artifacts prepared on 2026-06-17:
-
-- `app-debug.apk`: sideloadable debug APK for immediate testing.
-- `Stash-Tailscale-web-UI-Android-app-source.zip`: clean project source archive.
-
-See `RELEASE_ARTIFACTS.md` for local paths and SHA-256 hashes.
+- `Stash-Wrapper-v1.1.0.apk`: R8-optimized APK signed for seamless updates from v1.0.0.
+- `Stash-Tailscale-web-UI-Android-app-v1.1.0-source.zip`: clean project source archive.
+- `SHA256SUMS.txt`: SHA-256 checksums for both release artifacts.
 
 ## Phone Setup
 
