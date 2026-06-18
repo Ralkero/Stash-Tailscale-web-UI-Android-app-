@@ -1,5 +1,18 @@
 # Stash Tailscale Web UI Android App Release Artifacts
 
+## v1.4.0
+
+- APK: `Stash-Wrapper-v1.4.0.apk`
+- Source: `Stash-Tailscale-web-UI-Android-app-v1.4.0-source.zip`
+- Checksums: `SHA256SUMS.txt`
+
+```text
+6A61692ED9B5ECFE8DC7A243C0A13638F904B01C6624D242E8FE16D64164B999  Stash-Wrapper-v1.4.0.apk
+5D9E30AD0AD81C9D20B3F376627A8CFDFA58DACB0CCAB8E99CFE84AF9C65CE6D  Stash-Tailscale-web-UI-Android-app-v1.4.0-source.zip
+```
+
+This update tightens the overflow panel around its destination rows and promotes Settings to a full gear-and-label list entry.
+
 ## v1.3.0
 
 - APK: `Stash-Wrapper-v1.3.0.apk`

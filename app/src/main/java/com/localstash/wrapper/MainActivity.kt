@@ -864,7 +864,7 @@ class MainActivity : Activity() {
                             position: fixed !important;
                             right: 0.65rem !important;
                             top: 4.1rem !important;
-                            width: min(20rem, calc(100vw - 1.3rem)) !important;
+                            width: min(15rem, calc(100vw - 1.3rem)) !important;
                             z-index: 1041 !important;
                         }
 
@@ -884,13 +884,14 @@ class MainActivity : Activity() {
                         }
 
                         .top-nav .navbar-collapse .navbar-nav + .navbar-nav {
-                            border-top: 1px solid rgba(148, 163, 184, 0.25) !important;
+                            border-top: 0 !important;
                             display: flex !important;
                             flex-direction: row !important;
                             flex-wrap: wrap !important;
-                            justify-content: center !important;
-                            margin-top: 0.75rem !important;
-                            padding-top: 0.75rem !important;
+                            gap: 0.2rem !important;
+                            justify-content: space-evenly !important;
+                            margin-top: 0.2rem !important;
+                            padding-top: 0 !important;
                         }
 
                         .top-nav .navbar-collapse .navbar-nav:first-child > .nav-link {
@@ -916,6 +917,44 @@ class MainActivity : Activity() {
                             height: 1.5rem !important;
                             margin: 0 0.85rem 0 0 !important;
                             max-height: none !important;
+                            width: 1.5rem !important;
+                        }
+
+                        .top-nav .navbar-collapse .navbar-nav + .navbar-nav >
+                            .nav-utility[href$="/settings"] {
+                            border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;
+                            flex: 0 0 100% !important;
+                            margin: 0 0 0.4rem !important;
+                            order: -1 !important;
+                            padding: 0 0 0.4rem !important;
+                            width: 100% !important;
+                        }
+
+                        .top-nav .navbar-collapse .navbar-nav + .navbar-nav >
+                            .nav-utility[href$="/settings"] > .btn {
+                            align-items: center !important;
+                            display: flex !important;
+                            flex-direction: row !important;
+                            font-size: 1rem !important;
+                            justify-content: flex-start !important;
+                            min-height: 3.25rem !important;
+                            padding: 0.6rem 0.75rem !important;
+                            text-align: left !important;
+                            width: 100% !important;
+                        }
+
+                        .top-nav .navbar-collapse .navbar-nav + .navbar-nav >
+                            .nav-utility[href$="/settings"] > .btn::after {
+                            content: 'Settings';
+                        }
+
+                        .top-nav .navbar-collapse .navbar-nav + .navbar-nav >
+                            .nav-utility[href$="/settings"] .fa-icon,
+                        .top-nav .navbar-collapse .navbar-nav + .navbar-nav >
+                            .nav-utility[href$="/settings"] svg {
+                            flex: 0 0 auto !important;
+                            height: 1.5rem !important;
+                            margin: 0 0.85rem 0 0 !important;
                             width: 1.5rem !important;
                         }
                     `;
