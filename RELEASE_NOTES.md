@@ -1,6 +1,14 @@
-# Stash Tailscale Web UI Android App v1.1.0
+# Stash Tailscale Web UI Android App v1.2.0
 
 Private Android WebView wrapper for accessing Stash through Tailscale.
+
+## v1.2.0 Navigation Update
+
+- Removes Stash's redundant persistent mobile toolbar from the bottom of the WebView.
+- Moves Stash's existing hamburger control to a compact top-right overlay.
+- Keeps Images, Markers, Galleries, Performers, Statistics, Settings, Help, Donate, and Logout in the expanded menu.
+- Hides Scenes, Groups, Studios, and Tags from that menu because they are already available in the native bottom toolbar.
+- Reclaims the page space previously reserved for Stash's bottom toolbar.
 
 ## Included
 
@@ -33,8 +41,8 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 
 ## Artifacts
 
-- `Stash-Wrapper-v1.1.0.apk`: R8-optimized APK signed for seamless updates from v1.0.0.
-- `Stash-Tailscale-web-UI-Android-app-v1.1.0-source.zip`: clean project source archive.
+- `Stash-Wrapper-v1.2.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
+- `Stash-Tailscale-web-UI-Android-app-v1.2.0-source.zip`: clean project source archive.
 - `SHA256SUMS.txt`: SHA-256 checksums for both release artifacts.
 
 ## Phone Setup

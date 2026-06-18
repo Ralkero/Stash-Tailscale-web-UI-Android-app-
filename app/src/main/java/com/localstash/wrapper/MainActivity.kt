@@ -262,6 +262,7 @@ class MainActivity : Activity() {
                 progress.visibility = View.GONE
                 statusText.text = url ?: serverUrl
                 rememberLastUrl(url)
+                installStashNavigationChrome()
                 installSceneDisplayModeSync()
                 installMobilePlaybackSourceSync()
                 if (focusSearchOnNextPage) {
@@ -632,6 +633,12 @@ class MainActivity : Activity() {
         }, 300)
     }
 
+    private fun installStashNavigationChrome() {
+        webView.postDelayed({
+            webView.evaluateJavascript(STASH_NAVIGATION_CHROME_SCRIPT, null)
+        }, 100)
+    }
+
     private fun installMobilePlaybackSourceSync() {
         if (!mobilePlaybackEnabled) return
         val resolution = mobilePlaybackResolution.uppercase()
@@ -790,6 +797,137 @@ class MainActivity : Activity() {
             val label: String,
             val resolution: String
         )
+
+        private val STASH_NAVIGATION_CHROME_SCRIPT = """
+            (function() {
+                const STYLE_ID = 'stash-wrapper-navigation-style';
+                const COVERED_LABELS = new Set(['scenes', 'groups', 'studios', 'tags']);
+
+                if (!document.getElementById(STYLE_ID)) {
+                    const style = document.createElement('style');
+                    style.id = STYLE_ID;
+                    style.textContent = `
+                        body {
+                            padding-bottom: 0.5rem !important;
+                        }
+
+                        .top-nav {
+                            background: transparent !important;
+                            bottom: auto !important;
+                            height: 0 !important;
+                            min-height: 0 !important;
+                            padding: 0 !important;
+                            pointer-events: none !important;
+                            top: 0 !important;
+                        }
+
+                        .top-nav > .navbar-brand,
+                        .top-nav > .navbar-buttons > :not(.nav-menu-toggle),
+                        .top-nav .stash-wrapper-covered-link {
+                            display: none !important;
+                        }
+
+                        .top-nav > .navbar-buttons {
+                            margin: 0 !important;
+                            pointer-events: auto !important;
+                            position: fixed !important;
+                            right: 0.65rem !important;
+                            top: 0.65rem !important;
+                            z-index: 1042 !important;
+                        }
+
+                        .top-nav .nav-menu-toggle {
+                            align-items: center !important;
+                            background: rgba(15, 23, 42, 0.94) !important;
+                            border: 1px solid rgba(148, 163, 184, 0.45) !important;
+                            border-radius: 6px !important;
+                            color: #f8fafc !important;
+                            display: flex !important;
+                            height: 3rem !important;
+                            justify-content: center !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            width: 3rem !important;
+                        }
+
+                        .top-nav .navbar-collapse {
+                            background: #0f172a !important;
+                            border: 1px solid rgba(148, 163, 184, 0.35) !important;
+                            border-radius: 6px !important;
+                            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+                            left: 0.65rem !important;
+                            margin: 0 !important;
+                            max-height: calc(100vh - 5rem) !important;
+                            overflow-y: auto !important;
+                            padding: 0.75rem !important;
+                            pointer-events: auto !important;
+                            position: fixed !important;
+                            right: 0.65rem !important;
+                            top: 4.1rem !important;
+                            width: auto !important;
+                            z-index: 1041 !important;
+                        }
+
+                        .top-nav .navbar-collapse:not(.show) {
+                            display: none !important;
+                        }
+
+                        .top-nav .navbar-collapse .navbar-nav {
+                            align-items: stretch !important;
+                            display: grid !important;
+                            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                            gap: 0.5rem !important;
+                            justify-content: stretch !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                        }
+
+                        .top-nav .navbar-collapse .navbar-nav + .navbar-nav {
+                            border-top: 1px solid rgba(148, 163, 184, 0.25) !important;
+                            display: flex !important;
+                            flex-direction: row !important;
+                            flex-wrap: wrap !important;
+                            justify-content: center !important;
+                            margin-top: 0.75rem !important;
+                            padding-top: 0.75rem !important;
+                        }
+
+                        .top-nav .navbar-collapse .nav-link {
+                            max-width: none !important;
+                            width: 100% !important;
+                        }
+
+                        .top-nav .navbar-collapse .nav-link > .btn {
+                            min-height: 4.5rem !important;
+                            padding: 0.75rem !important;
+                            width: 100% !important;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                function filterCoveredDestinations() {
+                    const primaryMenu = document.querySelector(
+                        '.top-nav .navbar-collapse .navbar-nav:first-child'
+                    );
+                    if (!primaryMenu) return;
+
+                    primaryMenu.querySelectorAll(':scope > .nav-link').forEach(function(item) {
+                        const label = (item.textContent || '').trim().toLowerCase();
+                        item.classList.toggle('stash-wrapper-covered-link', COVERED_LABELS.has(label));
+                    });
+                }
+
+                if (!window.__stashWrapperNavigationObserver) {
+                    const observer = new MutationObserver(filterCoveredDestinations);
+                    observer.observe(document.documentElement, { childList: true, subtree: true });
+                    window.__stashWrapperNavigationObserver = observer;
+                }
+
+                filterCoveredDestinations();
+                return true;
+            })();
+        """.trimIndent()
 
         private val MOBILE_PLAYBACK_SOURCE_SYNC_SCRIPT = """
             (function() {

@@ -1,5 +1,18 @@
 # Stash Tailscale Web UI Android App Release Artifacts
 
+## v1.2.0
+
+- APK: `Stash-Wrapper-v1.2.0.apk`
+- Source: `Stash-Tailscale-web-UI-Android-app-v1.2.0-source.zip`
+- Checksums: `SHA256SUMS.txt`
+
+```text
+F15973F11554A4A91AFCEFA31B77498606E136EF16599F81F6CCB84F3E12F822  Stash-Wrapper-v1.2.0.apk
+F1697FED638EA20B327102D4ECB8D3C6EC84CB67574CE710AD4A0D5F2E86BAC1  Stash-Tailscale-web-UI-Android-app-v1.2.0-source.zip
+```
+
+This update removes Stash's redundant mobile bottom toolbar, relocates its native hamburger toggle to the top-right, and filters destinations already present in the wrapper's native bottom navigation.
+
 ## v1.1.0
 
 - APK: `Stash-Wrapper-v1.1.0.apk`

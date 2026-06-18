@@ -96,6 +96,8 @@ app\build\outputs\apk\release\app-release.apk
 
 ## Runtime controls
 
+- The persistent bottom toolbar opens Scenes, Groups, Studios, Tags, and contextual Search.
+- Stash's hamburger menu is pinned to the top-right and contains the remaining Stash destinations and utility actions.
 - `Refresh`: reloads the WebView.
 - `Status`: checks whether the Stash URL is reachable.
 - `Settings`: changes the server URL.
