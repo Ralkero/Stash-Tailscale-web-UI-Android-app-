@@ -1,6 +1,14 @@
-# Stash Tailscale Web UI Android App v1.5.0
+# Stash Tailscale Web UI Android App v1.6.0
 
 Private Android WebView wrapper for accessing Stash through Tailscale.
+
+## v1.6.0 Playback Quality Update
+
+- Adds a gear immediately to the left of playback speed in the Video.js control bar.
+- Offers Source, 4K, 1080P, 720P, and 480P on every scene player.
+- Preserves playback position and play/pause state when changing quality.
+- Keeps a manual quality choice active across later videos for the current app session.
+- Uses Stash's native source objects when available and its authenticated MP4 transcode endpoint for choices omitted by the server UI.
 
 ## v1.5.0 Responsiveness Update
 
@@ -61,8 +69,8 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 
 ## Artifacts
 
-- `Stash-Wrapper-v1.5.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
-- `Stash-Tailscale-web-UI-Android-app-v1.5.0-source.zip`: clean project source archive.
+- `Stash-Wrapper-v1.6.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
+- `Stash-Tailscale-web-UI-Android-app-v1.6.0-source.zip`: clean project source archive.
 - `SHA256SUMS.txt`: SHA-256 checksums for both release artifacts.
 
 ## Phone Setup

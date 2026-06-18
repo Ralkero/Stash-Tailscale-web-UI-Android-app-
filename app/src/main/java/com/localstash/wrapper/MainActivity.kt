@@ -1217,8 +1217,262 @@ class MainActivity : Activity() {
 
                 const state = {
                     targetResolution: targetResolution,
-                    applying: false
+                    applying: false,
+                    manualResolution: null
                 };
+
+                const QUALITY_OPTIONS = [
+                    { value: 'SOURCE', label: 'Source', resolution: null },
+                    { value: 'FOUR_K', label: '4K', resolution: 'FOUR_K' },
+                    { value: 'FULL_HD', label: '1080P', resolution: 'FULL_HD' },
+                    { value: 'STANDARD_HD', label: '720P', resolution: 'STANDARD_HD' },
+                    { value: 'STANDARD', label: '480P', resolution: 'STANDARD' }
+                ];
+
+                function getPlayer(root) {
+                    const video = root && root.querySelector('#VideoJsPlayer, video.video-js');
+                    return video && (video.player || video.player_);
+                }
+
+                function getSources(player) {
+                    if (!player || typeof player.sourceSelector !== 'function') return [];
+                    const selector = player.sourceSelector();
+                    return selector && Array.isArray(selector.sources) ? selector.sources : [];
+                }
+
+                function sourceResolution(source) {
+                    try {
+                        return new URL(source.src, window.location.href).searchParams.get('resolution');
+                    } catch (_) {
+                        return null;
+                    }
+                }
+
+                function findSource(sources, option) {
+                    if (option.value === 'SOURCE') {
+                        return sources.find(function(source) {
+                            const label = (source.label || '').toLowerCase();
+                            return !sourceResolution(source) && /direct|source/.test(label);
+                        }) || sources.find(function(source) {
+                            return !sourceResolution(source);
+                        }) || sources.find(function(source) {
+                            return sourceResolution(source) === 'ORIGINAL';
+                        }) || null;
+                    }
+
+                    return sources.find(function(source) {
+                        return sourceResolution(source) === option.resolution &&
+                            /video\/mp4/i.test(source.type || 'video/mp4');
+                    }) || null;
+                }
+
+                function makeTranscodeSource(sources, option) {
+                    const seed = sources.find(function(source) {
+                        try {
+                            return /\/scene\/\d+\/stream(?:\.[^/]*)?$/.test(
+                                new URL(source.src, window.location.href).pathname
+                            );
+                        } catch (_) {
+                            return false;
+                        }
+                    });
+                    if (!seed || !option.resolution) return null;
+
+                    const url = new URL(seed.src, window.location.href);
+                    url.pathname = url.pathname.replace(
+                        /(\/scene\/\d+\/stream)(?:\.[^/]*)?$/,
+                        '$1.mp4'
+                    );
+                    url.searchParams.set('resolution', option.resolution);
+                    return {
+                        src: url.href,
+                        type: 'video/mp4',
+                        label: 'MP4 ' + option.label
+                    };
+                }
+
+                function markSelected(root, value) {
+                    if (!root) return;
+                    root.querySelectorAll('.vjs-wrapper-quality-item').forEach(function(item) {
+                        const selected = item.dataset.quality === value;
+                        item.classList.toggle('vjs-selected', selected);
+                        item.setAttribute('aria-checked', selected ? 'true' : 'false');
+                    });
+                    const button = root.querySelector('.vjs-wrapper-quality-button');
+                    const option = QUALITY_OPTIONS.find(function(candidate) {
+                        return candidate.value === value;
+                    });
+                    if (button && option) {
+                        button.title = 'Quality: ' + option.label;
+                        button.setAttribute('aria-label', 'Quality: ' + option.label);
+                    }
+                }
+
+                function closeMenu(root) {
+                    const control = root && root.querySelector('.vjs-wrapper-quality');
+                    if (!control) return;
+                    control.classList.remove('vjs-wrapper-quality-open');
+                    const button = control.querySelector('.vjs-wrapper-quality-button');
+                    if (button) button.setAttribute('aria-expanded', 'false');
+                }
+
+                function switchQuality(root, option, remember) {
+                    const player = getPlayer(root);
+                    if (!player) return false;
+                    const sources = getSources(player);
+                    const source = findSource(sources, option) || makeTranscodeSource(sources, option);
+                    if (!source) return false;
+
+                    if (remember) {
+                        state.manualResolution = option.value;
+                    }
+                    markSelected(root, option.value);
+                    closeMenu(root);
+
+                    const current = typeof player.currentSource === 'function'
+                        ? player.currentSource()
+                        : null;
+                    if (current && current.src === source.src) return true;
+
+                    const currentTime = typeof player.currentTime === 'function'
+                        ? player.currentTime()
+                        : 0;
+                    const wasPaused = typeof player.paused === 'function' ? player.paused() : true;
+                    state.applying = true;
+                    player.src(source);
+
+                    function restorePlaybackState() {
+                        if (Number.isFinite(currentTime) && currentTime > 0) {
+                            const restoredTime = player.currentTime();
+                            if (!Number.isFinite(restoredTime) || Math.abs(restoredTime - currentTime) > 1) {
+                                try { player.currentTime(currentTime); } catch (_) {}
+                            }
+                        }
+                        if (wasPaused) {
+                            player.pause();
+                        } else {
+                            const playResult = player.play();
+                            if (playResult && typeof playResult.catch === 'function') {
+                                playResult.catch(function() {});
+                            }
+                        }
+                    }
+
+                    player.one('loadedmetadata', restorePlaybackState);
+                    player.one('canplay', function() {
+                        restorePlaybackState();
+                        [250, 750, 1500].forEach(function(delay) {
+                            setTimeout(restorePlaybackState, delay);
+                        });
+                        state.applying = false;
+                    });
+                    setTimeout(function() { state.applying = false; }, 3000);
+                    return true;
+                }
+
+                function ensureQualityMenu(root) {
+                    const controlBar = root && root.querySelector('.vjs-control-bar');
+                    if (!controlBar) return;
+
+                    root.querySelectorAll('.vjs-source-selector').forEach(function(button) {
+                        button.classList.add('stash-wrapper-hidden-source-selector');
+                    });
+
+                    let control = controlBar.querySelector('.vjs-wrapper-quality');
+                    if (!control) {
+                        control = document.createElement('div');
+                        control.className = 'vjs-wrapper-quality vjs-menu-button vjs-control vjs-button';
+                        control.innerHTML = `
+                            <button class="vjs-wrapper-quality-button" type="button"
+                                aria-haspopup="true" aria-expanded="false" aria-label="Quality">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6-2-3.4-2.5 1a7.7 7.7 0 0 0-1.7-1L15 3.3h-4L10.7 6A7.7 7.7 0 0 0 9 7L6.5 6l-2 3.4L6.6 11a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2.1 1.6 2 3.4L9 17a7.7 7.7 0 0 0 1.7 1l.3 2.7h4l.3-2.7a7.7 7.7 0 0 0 1.7-1l2.5 1 2-3.4L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/>
+                                </svg>
+                            </button>
+                            <div class="vjs-wrapper-quality-menu vjs-menu">
+                                <ul class="vjs-menu-content" role="menu"></ul>
+                            </div>
+                        `;
+                        const menu = control.querySelector('.vjs-menu-content');
+                        QUALITY_OPTIONS.forEach(function(option) {
+                            const item = document.createElement('li');
+                            item.className = 'vjs-menu-item vjs-wrapper-quality-item';
+                            item.dataset.quality = option.value;
+                            item.setAttribute('role', 'menuitemradio');
+                            item.setAttribute('aria-checked', 'false');
+                            item.textContent = option.label;
+                            item.addEventListener('click', function(event) {
+                                event.stopPropagation();
+                                switchQuality(root, option, true);
+                            });
+                            menu.appendChild(item);
+                        });
+
+                        const button = control.querySelector('.vjs-wrapper-quality-button');
+                        ['touchstart', 'pointerdown', 'mousedown'].forEach(function(eventName) {
+                            control.addEventListener(eventName, function(event) {
+                                event.stopPropagation();
+                            });
+                        });
+                        control.addEventListener('click', function(event) {
+                            event.stopPropagation();
+                            if (event.target.closest('.vjs-wrapper-quality-item')) return;
+                            const open = control.classList.toggle('vjs-wrapper-quality-open');
+                            button.setAttribute('aria-expanded', open ? 'true' : 'false');
+                        });
+
+                        const playbackRate = controlBar.querySelector('.vjs-playback-rate');
+                        if (playbackRate) {
+                            controlBar.insertBefore(control, playbackRate);
+                        } else {
+                            const fullscreen = controlBar.querySelector('.vjs-fullscreen-control');
+                            controlBar.insertBefore(control, fullscreen || null);
+                        }
+                    }
+
+                    if (!document.getElementById('stash-wrapper-quality-style')) {
+                        const style = document.createElement('style');
+                        style.id = 'stash-wrapper-quality-style';
+                        style.textContent = `
+                            .stash-wrapper-hidden-source-selector { display: none !important; }
+                            .vjs-wrapper-quality { position: relative !important; }
+                            .vjs-wrapper-quality-button {
+                                background: transparent; border: 0; color: inherit; cursor: pointer;
+                                height: 100%; margin: 0; padding: 0; width: 100%;
+                            }
+                            .vjs-wrapper-quality-button svg {
+                                fill: currentColor; height: 1.75em; vertical-align: middle; width: 1.75em;
+                            }
+                            .vjs-wrapper-quality-menu {
+                                bottom: 3em !important; display: none !important; left: 50% !important;
+                                opacity: 0 !important; position: absolute !important;
+                                transform: translateX(-50%) !important; visibility: hidden !important;
+                                width: 8em !important;
+                            }
+                            .vjs-wrapper-quality-open .vjs-wrapper-quality-menu {
+                                display: block !important; opacity: 1 !important; visibility: visible !important;
+                            }
+                            .vjs-wrapper-quality-menu .vjs-menu-content {
+                                display: block !important; max-height: none !important; position: static !important;
+                            }
+                            .vjs-wrapper-quality-menu .vjs-wrapper-quality-item {
+                                cursor: pointer; text-transform: none !important;
+                            }
+                        `;
+                        document.head.appendChild(style);
+                    }
+
+                    if (state.manualResolution) {
+                        markSelected(root, state.manualResolution);
+                    } else {
+                        const player = getPlayer(root);
+                        const current = player && typeof player.currentSource === 'function'
+                            ? player.currentSource()
+                            : null;
+                        const resolution = current && sourceResolution(current);
+                        markSelected(root, resolution || 'SOURCE');
+                    }
+                }
 
                 function preferredPatterns() {
                     if (state.targetResolution === 'FULL_HD') {
@@ -1256,9 +1510,29 @@ class MainActivity : Activity() {
 
                 function applyPreferredSource() {
                     if (state.applying) return;
-                    if (!wrapper.config.mobilePlaybackEnabled) return;
                     const root = wrapper.playbackRoot || document.querySelector('.VideoPlayer');
                     if (!root) return;
+                    ensureQualityMenu(root);
+
+                    if (state.manualResolution) {
+                        const player = getPlayer(root);
+                        const current = player && typeof player.currentSource === 'function'
+                            ? player.currentSource()
+                            : null;
+                        const currentResolution = current && sourceResolution(current);
+                        const alreadySelected = state.manualResolution === 'SOURCE'
+                            ? !currentResolution || currentResolution === 'ORIGINAL'
+                            : currentResolution === state.manualResolution;
+                        if (!alreadySelected) {
+                            const option = QUALITY_OPTIONS.find(function(candidate) {
+                                return candidate.value === state.manualResolution;
+                            });
+                            if (option) switchQuality(root, option, false);
+                        }
+                        return;
+                    }
+
+                    if (!wrapper.config.mobilePlaybackEnabled) return;
                     const items = Array.from(root.querySelectorAll('.vjs-source-menu-item'));
                     if (!items.length) return;
                     const preferred = findPreferredItem(items);

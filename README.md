@@ -22,13 +22,15 @@ http://100.102.126.109:9999/
 
 Fresh installs default to Stash's original direct stream. Existing installs keep their saved playback preference during an update.
 
+While a video is open, tap the gear immediately to the left of playback speed to switch between Source, 4K, 1080P, 720P, and 480P. The wrapper keeps the current playback position and play/pause state while changing quality. A manual choice remains active for later videos during the current app session and takes priority over the automatic mobile-playback preference.
+
 For slower remote connections, open the hidden toolbar, tap Settings, and enable "Prefer mobile playback transcodes." The wrapper selects Stash's native MP4 source directly inside its Video.js player instead of proxying video bytes through Android:
 
 ```text
 /scene/<id>/stream.mp4?resolution=STANDARD_HD
 ```
 
-The available settings are 480p, 720p, 1080p when Stash offers it, and Original. If a requested source is unavailable, Stash's normal source remains active. All traffic remains private inside Tailscale.
+The Settings screen can still choose the automatic startup preference. The in-player gear exposes all requested resolutions even when Stash hides higher choices because of its global maximum-transcode setting. If Stash cannot construct a stream for a scene, its normal source remains available. All traffic remains private inside Tailscale.
 
 Configure Stash's native transcode settings from this project:
 
