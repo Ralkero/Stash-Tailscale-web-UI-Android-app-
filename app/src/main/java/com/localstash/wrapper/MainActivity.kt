@@ -2,10 +2,13 @@ package com.localstash.wrapper
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.res.ColorStateList
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
 import android.net.Uri
 import android.os.Build
@@ -49,14 +52,18 @@ class MainActivity : Activity() {
     private lateinit var bottomNav: LinearLayout
     private lateinit var statusText: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var pageProgress: ProgressBar
     private lateinit var webView: WebView
     private var fullScreenView: View? = null
     private var fullScreenCallback: WebChromeClient.CustomViewCallback? = null
     private var toolbarVisible = false
     private var gestureStartY = 0f
     private var gestureStartedNearTop = false
-    private var focusSearchOnNextPage = false
     private var activeNavItem: LinearLayout? = null
+    private val navItemsByPath = mutableMapOf<String, LinearLayout>()
+    private var navigationGeneration = 0
+    private var pendingNavigationAction: Pair<Int, () -> Unit>? = null
+    private var mainFrameLoading = false
 
     private val defaultUrl: String
         get() = getString(R.string.default_stash_url)
@@ -111,7 +118,7 @@ class MainActivity : Activity() {
         root = FrameLayout(this)
         val vertical = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(STASH_BACKGROUND_COLOR)
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -160,6 +167,7 @@ class MainActivity : Activity() {
         chrome.addView(buttonRow)
 
         webView = WebView(this).apply {
+            setBackgroundColor(STASH_BACKGROUND_COLOR)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
@@ -167,7 +175,20 @@ class MainActivity : Activity() {
             )
         }
 
+        pageProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = 0
+            progressTintList = ColorStateList.valueOf(Color.rgb(14, 165, 233))
+            progressBackgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(2)
+            )
+        }
+
         vertical.addView(chrome)
+        vertical.addView(pageProgress)
         vertical.addView(webView)
         bottomNav = buildBottomNav()
         vertical.addView(bottomNav)
@@ -254,21 +275,28 @@ class MainActivity : Activity() {
             }
 
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                mainFrameLoading = true
+                pageProgress.progress = 5
+                pageProgress.visibility = View.VISIBLE
                 progress.visibility = View.VISIBLE
                 statusText.text = "Loading Stash..."
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
+                mainFrameLoading = false
+                pageProgress.visibility = View.GONE
                 progress.visibility = View.GONE
                 statusText.text = url ?: serverUrl
                 rememberLastUrl(url)
-                installStashNavigationChrome()
-                installSceneDisplayModeSync()
-                installMobilePlaybackSourceSync()
-                if (focusSearchOnNextPage) {
-                    focusSearchOnNextPage = false
-                    focusStashSearchBox()
-                }
+                syncNavSelection(url)
+                installStashEnhancements()
+                pendingNavigationAction?.takeIf { it.first == navigationGeneration }?.second?.invoke()
+                pendingNavigationAction = null
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                syncNavSelection(url)
             }
 
             override fun onReceivedError(
@@ -277,6 +305,8 @@ class MainActivity : Activity() {
                 error: WebResourceError
             ) {
                 if (request.isForMainFrame) {
+                    mainFrameLoading = false
+                    pageProgress.visibility = View.GONE
                     progress.visibility = View.GONE
                     statusText.text = "Cannot reach Stash. Check Tailscale and the PC."
                     Toast.makeText(
@@ -299,6 +329,13 @@ class MainActivity : Activity() {
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                if (mainFrameLoading) {
+                    pageProgress.progress = newProgress.coerceAtLeast(5)
+                    pageProgress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
+                }
+            }
+
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
                 if (fullScreenView != null) {
                     callback.onCustomViewHidden()
@@ -504,15 +541,31 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(64)
             )
-            addView(navItem("Scenes", R.drawable.ic_nav_scenes) { navigateToPath("/scenes") })
-            addView(navItem("Groups", R.drawable.ic_nav_groups) { navigateToPath("/groups") })
-            addView(navItem("Studios", R.drawable.ic_nav_studios) { navigateToPath("/studios") })
-            addView(navItem("Tags", R.drawable.ic_nav_tags) { navigateToPath("/tags") })
-            addView(navItem("Search", R.drawable.ic_nav_search) { openSearch() })
+            addDestinationNavItem(this, "Scenes", R.drawable.ic_nav_scenes, "/scenes")
+            addDestinationNavItem(this, "Groups", R.drawable.ic_nav_groups, "/groups")
+            addDestinationNavItem(this, "Studios", R.drawable.ic_nav_studios, "/studios")
+            addDestinationNavItem(this, "Tags", R.drawable.ic_nav_tags, "/tags")
+            addView(navItem("Search", R.drawable.ic_nav_search, selectOnClick = false) { openSearch() })
         }
     }
 
-    private fun navItem(label: String, iconRes: Int, onClick: () -> Unit): LinearLayout {
+    private fun addDestinationNavItem(
+        parent: LinearLayout,
+        label: String,
+        iconRes: Int,
+        path: String
+    ) {
+        val item = navItem(label, iconRes) { navigateToPath(path) }
+        navItemsByPath[path] = item
+        parent.addView(item)
+    }
+
+    private fun navItem(
+        label: String,
+        iconRes: Int,
+        selectOnClick: Boolean = true,
+        onClick: () -> Unit
+    ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -521,7 +574,7 @@ class MainActivity : Activity() {
             background = navItemBackground()
             setPadding(dp(2), dp(3), dp(2), dp(3))
             setOnClickListener {
-                markNavItemActive(this)
+                if (selectOnClick) markNavItemActive(this)
                 onClick()
             }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
@@ -548,8 +601,9 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun navigateToPath(path: String) {
-        focusSearchOnNextPage = false
+    private fun navigateToPath(path: String, onComplete: (() -> Unit)? = null) {
+        val requestId = ++navigationGeneration
+        pendingNavigationAction = null
         val fullTarget = stashUrlWithCurrentSceneDisplay(path)
         val targetUri = Uri.parse(fullTarget)
         val targetPath = buildString {
@@ -559,6 +613,7 @@ class MainActivity : Activity() {
         }
         val currentUri = webView.url?.let(Uri::parse)
         if (currentUri == null || !isAllowedInWebView(currentUri)) {
+            if (onComplete != null) pendingNavigationAction = requestId to onComplete
             webView.loadUrl(fullTarget)
             return
         }
@@ -579,17 +634,14 @@ class MainActivity : Activity() {
         """.trimIndent()
 
         webView.evaluateJavascript(navigateScript) { result ->
+            if (requestId != navigationGeneration) return@evaluateJavascript
             if (result != "true") {
+                if (onComplete != null) pendingNavigationAction = requestId to onComplete
                 webView.loadUrl(fullTarget)
                 return@evaluateJavascript
             }
-            webView.postDelayed({
-                val verifyScript =
-                    "location.pathname + location.search + location.hash === $quotedTarget"
-                webView.evaluateJavascript(verifyScript) { matches ->
-                    if (matches != "true") webView.loadUrl(fullTarget)
-                }
-            }, 350)
+            syncNavSelection(fullTarget)
+            onComplete?.invoke()
         }
     }
 
@@ -604,11 +656,9 @@ class MainActivity : Activity() {
         }
 
         if (currentPath.startsWith(searchablePath)) {
-            focusSearchOnNextPage = false
             focusStashSearchBox()
         } else {
-            focusSearchOnNextPage = true
-            webView.loadUrl(stashUrlWithCurrentSceneDisplay(searchablePath))
+            navigateToPath(searchablePath) { focusStashSearchBox() }
         }
     }
 
@@ -627,44 +677,66 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun installSceneDisplayModeSync() {
+    private fun installStashEnhancements() {
+        val resolution = mobilePlaybackResolution.uppercase()
+        val config = JSONObject()
+            .put(
+                "mobilePlaybackEnabled",
+                mobilePlaybackEnabled &&
+                    resolution != "ORIGINAL" &&
+                    resolution in SUPPORTED_MOBILE_RESOLUTIONS
+            )
+            .put("mobilePlaybackResolution", resolution)
+        val script = buildString {
+            append(STASH_WRAPPER_BOOTSTRAP_SCRIPT.replace("__CONFIG__", config.toString()))
+            append('\n')
+            append(STASH_NAVIGATION_CHROME_SCRIPT)
+            append('\n')
+            append(MOBILE_PLAYBACK_SOURCE_SYNC_SCRIPT.replace("__TARGET_RESOLUTION__", JSONObject.quote(resolution)))
+            append('\n')
+            append(SCENE_DISPLAY_MODE_SYNC_SCRIPT)
+        }
         webView.postDelayed({
-            webView.evaluateJavascript(SCENE_DISPLAY_MODE_SYNC_SCRIPT, null)
-        }, 300)
-    }
-
-    private fun installStashNavigationChrome() {
-        webView.postDelayed({
-            webView.evaluateJavascript(STASH_NAVIGATION_CHROME_SCRIPT, null)
+            webView.evaluateJavascript(script, null)
         }, 100)
     }
 
-    private fun installMobilePlaybackSourceSync() {
-        if (!mobilePlaybackEnabled) return
-        val resolution = mobilePlaybackResolution.uppercase()
-        if (resolution == "ORIGINAL" || resolution !in SUPPORTED_MOBILE_RESOLUTIONS) return
-        val script = MOBILE_PLAYBACK_SOURCE_SYNC_SCRIPT.replace(
-            "__TARGET_RESOLUTION__",
-            JSONObject.quote(resolution)
-        )
-        webView.postDelayed({
-            webView.evaluateJavascript(script, null)
-        }, 300)
-    }
-
-    private fun navItemBackground(): StateListDrawable {
-        return StateListDrawable().apply {
+    private fun navItemBackground(): Drawable {
+        val content = StateListDrawable().apply {
             addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(Color.rgb(51, 65, 85)))
             addState(intArrayOf(android.R.attr.state_focused), ColorDrawable(Color.rgb(51, 65, 85)))
             addState(intArrayOf(android.R.attr.state_selected), ColorDrawable(Color.rgb(30, 41, 59)))
             addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
         }
+        return RippleDrawable(
+            ColorStateList.valueOf(Color.argb(110, 148, 163, 184)),
+            content,
+            null
+        )
     }
 
     private fun markNavItemActive(item: LinearLayout) {
         activeNavItem?.isSelected = false
         activeNavItem = item
         item.isSelected = true
+    }
+
+    private fun syncNavSelection(value: String?) {
+        val path = try {
+            Uri.parse(value ?: return).path ?: return
+        } catch (_: Exception) {
+            return
+        }
+        val destination = when {
+            path.startsWith("/scenes") -> "/scenes"
+            path.startsWith("/groups") -> "/groups"
+            path.startsWith("/studios") -> "/studios"
+            path.startsWith("/tags") -> "/tags"
+            else -> null
+        }
+        activeNavItem?.isSelected = false
+        activeNavItem = destination?.let(navItemsByPath::get)
+        activeNavItem?.isSelected = true
     }
 
     private fun stashUrl(path: String): String {
@@ -785,6 +857,7 @@ class MainActivity : Activity() {
         private const val KEY_MOBILE_PLAYBACK_ENABLED = "mobile_playback_enabled"
         private const val KEY_MOBILE_PLAYBACK_RESOLUTION = "mobile_playback_resolution"
         private const val DEFAULT_MOBILE_RESOLUTION = "STANDARD_HD"
+        private val STASH_BACKGROUND_COLOR = Color.rgb(30, 42, 50)
         private val SUPPORTED_MOBILE_RESOLUTIONS = setOf("STANDARD", "STANDARD_HD", "FULL_HD")
         private val MOBILE_PLAYBACK_OPTIONS = listOf(
             PlaybackOption("720p mobile", "STANDARD_HD"),
@@ -798,8 +871,159 @@ class MainActivity : Activity() {
             val resolution: String
         )
 
+        private val STASH_WRAPPER_BOOTSTRAP_SCRIPT = """
+            (function(config) {
+                const existing = window.__stashWrapper;
+                if (existing) {
+                    existing.config = config;
+                    existing.schedule({ all: true });
+                    return true;
+                }
+
+                const state = {
+                    config: config,
+                    frame: 0,
+                    flags: { nav: false, playback: false, scene: false },
+                    navRoot: null,
+                    navObserver: null,
+                    playbackRoot: null,
+                    playbackObserver: null,
+                    lastUrl: location.href
+                };
+
+                function mergeFlags(next) {
+                    if (!next) return;
+                    if (next.all) {
+                        state.flags.nav = true;
+                        state.flags.playback = true;
+                        state.flags.scene = true;
+                        return;
+                    }
+                    if (next.nav) state.flags.nav = true;
+                    if (next.playback) state.flags.playback = true;
+                    if (next.scene) state.flags.scene = true;
+                }
+
+                function connectNavObserver() {
+                    const root = document.querySelector('.top-nav');
+                    if (root === state.navRoot) return;
+                    if (state.navObserver) state.navObserver.disconnect();
+                    state.navRoot = root;
+                    state.navObserver = null;
+                    if (!root) return;
+                    state.navObserver = new MutationObserver(function() {
+                        state.schedule({ nav: true });
+                    });
+                    state.navObserver.observe(root, { childList: true, subtree: true });
+                }
+
+                function connectPlaybackObserver() {
+                    if (!state.config.mobilePlaybackEnabled) {
+                        if (state.playbackObserver) state.playbackObserver.disconnect();
+                        state.playbackObserver = null;
+                        state.playbackRoot = null;
+                        return;
+                    }
+                    const root = document.querySelector('.VideoPlayer');
+                    if (root === state.playbackRoot) return;
+                    if (state.playbackObserver) state.playbackObserver.disconnect();
+                    state.playbackRoot = root;
+                    state.playbackObserver = null;
+                    if (!root) return;
+                    state.playbackObserver = new MutationObserver(function() {
+                        state.schedule({ playback: true });
+                    });
+                    state.playbackObserver.observe(root, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['class', 'aria-checked', 'aria-selected']
+                    });
+                }
+
+                function flush() {
+                    state.frame = 0;
+                    const flags = state.flags;
+                    state.flags = { nav: false, playback: false, scene: false };
+
+                    if (flags.nav) {
+                        connectNavObserver();
+                        state.navigation && state.navigation.apply();
+                    }
+                    if (flags.playback) {
+                        connectPlaybackObserver();
+                        state.playback && state.playback.apply();
+                    }
+                    if (flags.scene) {
+                        state.scene && state.scene.schedule(80);
+                    }
+                }
+
+                state.schedule = function(flags) {
+                    mergeFlags(flags);
+                    if (state.frame) return;
+                    state.frame = requestAnimationFrame(flush);
+                };
+
+                function containsMatch(node, selector) {
+                    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+                    return node.matches(selector) || !!node.querySelector(selector);
+                }
+
+                state.documentObserver = new MutationObserver(function(records) {
+                    let nav = false;
+                    let playback = false;
+                    let scene = false;
+
+                    for (const record of records) {
+                        for (const node of record.addedNodes) {
+                            if (!nav && containsMatch(node, '.top-nav')) nav = true;
+                            if (!playback && containsMatch(node, '.VideoPlayer')) playback = true;
+                            if (!scene && containsMatch(node, '.item-list-container.scene-list')) scene = true;
+                        }
+                    }
+
+                    if (state.navRoot && !state.navRoot.isConnected) nav = true;
+                    if (state.playbackRoot && !state.playbackRoot.isConnected) playback = true;
+                    if (location.href !== state.lastUrl) {
+                        state.lastUrl = location.href;
+                        nav = true;
+                        playback = true;
+                        scene = true;
+                    }
+                    if (nav || playback || scene) state.schedule({ nav, playback, scene });
+                });
+                state.documentObserver.observe(document.documentElement, {
+                    childList: true,
+                    subtree: true
+                });
+
+                function wrapHistory(name) {
+                    const original = history[name];
+                    history[name] = function() {
+                        const result = original.apply(this, arguments);
+                        state.lastUrl = location.href;
+                        state.schedule({ nav: true, playback: true, scene: true });
+                        return result;
+                    };
+                }
+                wrapHistory('pushState');
+                wrapHistory('replaceState');
+                window.addEventListener('popstate', function() {
+                    state.lastUrl = location.href;
+                    state.schedule({ nav: true, playback: true, scene: true });
+                });
+
+                window.__stashWrapper = state;
+                state.schedule({ all: true });
+                return true;
+            })(__CONFIG__);
+        """.trimIndent()
+
         private val STASH_NAVIGATION_CHROME_SCRIPT = """
             (function() {
+                const wrapper = window.__stashWrapper;
+                if (!wrapper) return false;
                 const STYLE_ID = 'stash-wrapper-navigation-style';
                 const COVERED_LABELS = new Set(['scenes', 'groups', 'studios', 'tags']);
 
@@ -973,35 +1197,27 @@ class MainActivity : Activity() {
                     });
                 }
 
-                if (!window.__stashWrapperNavigationObserver) {
-                    const observer = new MutationObserver(filterCoveredDestinations);
-                    observer.observe(document.documentElement, { childList: true, subtree: true });
-                    window.__stashWrapperNavigationObserver = observer;
-                }
-
-                filterCoveredDestinations();
+                wrapper.navigation = { apply: filterCoveredDestinations };
+                wrapper.schedule({ nav: true });
                 return true;
             })();
         """.trimIndent()
 
         private val MOBILE_PLAYBACK_SOURCE_SYNC_SCRIPT = """
             (function() {
+                const wrapper = window.__stashWrapper;
+                if (!wrapper) return false;
                 const targetResolution = __TARGET_RESOLUTION__;
-                const existing = window.__stashWrapperMobilePlaybackSourceSync;
+                const existing = wrapper.playback;
                 if (existing) {
                     existing.targetResolution = targetResolution;
-                    existing.schedule(0);
+                    wrapper.schedule({ playback: true });
                     return true;
                 }
 
                 const state = {
                     targetResolution: targetResolution,
-                    timer: 0,
-                    applying: false,
-                    schedule: function(delay) {
-                        clearTimeout(state.timer);
-                        state.timer = setTimeout(applyPreferredSource, delay || 0);
-                    }
+                    applying: false
                 };
 
                 function preferredPatterns() {
@@ -1040,7 +1256,10 @@ class MainActivity : Activity() {
 
                 function applyPreferredSource() {
                     if (state.applying) return;
-                    const items = Array.from(document.querySelectorAll('.vjs-source-menu-item'));
+                    if (!wrapper.config.mobilePlaybackEnabled) return;
+                    const root = wrapper.playbackRoot || document.querySelector('.VideoPlayer');
+                    if (!root) return;
+                    const items = Array.from(root.querySelectorAll('.vjs-source-menu-item'));
                     if (!items.length) return;
                     const preferred = findPreferredItem(items);
                     if (!preferred || isSelected(preferred)) return;
@@ -1052,33 +1271,21 @@ class MainActivity : Activity() {
                     }, 500);
                 }
 
-                const observer = new MutationObserver(function() {
-                    state.schedule(150);
-                });
-                observer.observe(document.documentElement, {
-                    childList: true,
-                    subtree: true,
-                    attributes: true,
-                    attributeFilter: ['class', 'aria-checked', 'aria-selected']
-                });
-
-                window.__stashWrapperMobilePlaybackSourceSync = state;
-                state.schedule(0);
-                setTimeout(function() { state.schedule(0); }, 500);
-                setTimeout(function() { state.schedule(0); }, 1200);
+                state.apply = applyPreferredSource;
+                wrapper.playback = state;
+                wrapper.schedule({ playback: true });
                 return true;
             })();
         """.trimIndent()
 
         private val SCENE_DISPLAY_MODE_SYNC_SCRIPT = """
             (function() {
-                if (window.__stashWrapperSceneDisplaySyncInstalled) {
-                    window.__stashWrapperSceneDisplaySyncApply &&
-                        window.__stashWrapperSceneDisplaySyncApply();
+                const wrapper = window.__stashWrapper;
+                if (!wrapper) return false;
+                if (wrapper.scene) {
+                    wrapper.scene.schedule(0);
                     return true;
                 }
-
-                window.__stashWrapperSceneDisplaySyncInstalled = true;
 
                 const STORAGE_KEY = 'stashWrapper.sceneDisplayMode';
                 const MODES = {
@@ -1095,7 +1302,7 @@ class MainActivity : Activity() {
                 };
                 let applying = false;
                 let userModeChangedAt = 0;
-                let lastUrl = location.href;
+                let syncTimer = 0;
 
                 function sceneListRoot() {
                     return document.querySelector('.item-list-container.scene-list');
@@ -1229,26 +1436,9 @@ class MainActivity : Activity() {
                 }
 
                 function scheduleSync(delay) {
-                    setTimeout(sync, delay || 0);
+                    clearTimeout(syncTimer);
+                    syncTimer = setTimeout(sync, delay || 0);
                 }
-
-                function wrapHistory(name) {
-                    const original = history[name];
-                    history[name] = function() {
-                        const result = original.apply(this, arguments);
-                        scheduleSync(60);
-                        scheduleSync(250);
-                        return result;
-                    };
-                }
-
-                wrapHistory('pushState');
-                wrapHistory('replaceState');
-
-                window.addEventListener('popstate', function() {
-                    scheduleSync(60);
-                    scheduleSync(250);
-                });
 
                 document.addEventListener('click', function(event) {
                     if (!hasSceneListDom()) return;
@@ -1264,18 +1454,8 @@ class MainActivity : Activity() {
                     }, 120);
                 }, true);
 
-                const observer = new MutationObserver(function() {
-                    if (location.href !== lastUrl) {
-                        lastUrl = location.href;
-                        scheduleSync(60);
-                    }
-                    scheduleSync(300);
-                });
-                observer.observe(document.documentElement, { childList: true, subtree: true });
-
-                window.__stashWrapperSceneDisplaySyncApply = sync;
-                scheduleSync(100);
-                scheduleSync(500);
+                wrapper.scene = { apply: sync, schedule: scheduleSync };
+                wrapper.schedule({ scene: true });
                 return true;
             })();
         """.trimIndent()

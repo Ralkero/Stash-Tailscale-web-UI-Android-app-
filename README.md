@@ -102,3 +102,9 @@ app\build\outputs\apk\release\app-release.apk
 - `Status`: checks whether the Stash URL is reachable.
 - `Settings`: changes the server URL.
 - `Logout`: clears WebView cookies and reloads Stash.
+
+## Responsiveness
+
+- Bottom destinations and contextual Search use Stash's SPA router instead of reloading the WebView.
+- Wrapper DOM enhancements share one frame-coalesced scheduler and scope observation to the navbar and active video player.
+- Full page loads use a thin progress indicator; SPA transitions remain immediate.

@@ -1,6 +1,14 @@
-# Stash Tailscale Web UI Android App v1.4.0
+# Stash Tailscale Web UI Android App v1.5.0
 
 Private Android WebView wrapper for accessing Stash through Tailscale.
+
+## v1.5.0 Responsiveness Update
+
+- Consolidates three page-wide enhancement observers into one coordinated scheduler with scoped navbar and video-player observation.
+- Removes a rapid-navigation race that could reload an older destination after a newer tab tap.
+- Uses SPA navigation when Search is opened from Images, Performers, or another overflow destination.
+- Adds native ripple feedback, route-aware bottom-tab selection, a dark loading background, and a thin full-load progress indicator.
+- Reduces the measured scene-scroll jank rate from 0.81% to 0.34%, median frame time from 9 ms to 5 ms, and p95 from 10 ms to 8 ms in the same device benchmark.
 
 ## v1.4.0 Menu Density Update
 
@@ -53,8 +61,8 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 
 ## Artifacts
 
-- `Stash-Wrapper-v1.4.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
-- `Stash-Tailscale-web-UI-Android-app-v1.4.0-source.zip`: clean project source archive.
+- `Stash-Wrapper-v1.5.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
+- `Stash-Tailscale-web-UI-Android-app-v1.5.0-source.zip`: clean project source archive.
 - `SHA256SUMS.txt`: SHA-256 checksums for both release artifacts.
 
 ## Phone Setup

@@ -1,5 +1,18 @@
 # Stash Tailscale Web UI Android App Release Artifacts
 
+## v1.5.0
+
+- APK: `Stash-Wrapper-v1.5.0.apk`
+- Source: `Stash-Tailscale-web-UI-Android-app-v1.5.0-source.zip`
+- Checksums: `SHA256SUMS.txt`
+
+```text
+2A0C54D9717F6E046BBB225093D2822F51EB9E8177573E1A400F23B671F98155  Stash-Wrapper-v1.5.0.apk
+24F9CF679D5487C90A25953EF19EA5729F2657FBF1D1E367189C4C6A7DAFF8E6  Stash-Tailscale-web-UI-Android-app-v1.5.0-source.zip
+```
+
+This update consolidates WebView enhancement scheduling, removes a rapid-tab race, routes contextual Search through the SPA, and adds native ripple, route-selection, dark-load, and progress feedback. The repeat device benchmark improved janky frames from 0.81% to 0.34% and p95 frame time from 10 ms to 8 ms.
+
 ## v1.4.0
 
 - APK: `Stash-Wrapper-v1.4.0.apk`
