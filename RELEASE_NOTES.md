@@ -1,6 +1,21 @@
-# Stash Tailscale Web UI Android App v1.6.0
+# Stash Tailscale Web UI Android App v1.7.0
 
 Private Android WebView wrapper for accessing Stash through Tailscale.
+
+## v1.7.0 Fullscreen and Startup Update
+
+- Makes Video.js fullscreen use Android immersive fullscreen, including status bar, navigation bar, and display-cutout space.
+- Adds Fit, Fill / Crop, Zoom 110%, Zoom 125%, and Stretch video sizing controls.
+- Keeps the chosen sizing mode across videos for the current app session.
+- Adds left/right swipe navigation to image-gallery lightboxes without intercepting vertical or multi-touch gestures.
+- Opens the first Scenes page on each fresh launch instead of restoring stale pagination or detail routes.
+- Includes the v1.6.1 source-resolution filtering fix for the quality menu.
+
+## v1.6.1 Source Resolution Filtering
+
+- Shows only quality choices at or below the current video's source resolution.
+- Always keeps Source available.
+- Caps a higher session-persisted choice when the next video has a lower source resolution.
 
 ## v1.6.0 Playback Quality Update
 
@@ -69,8 +84,8 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 
 ## Artifacts
 
-- `Stash-Wrapper-v1.6.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
-- `Stash-Tailscale-web-UI-Android-app-v1.6.0-source.zip`: clean project source archive.
+- `Stash-Wrapper-v1.7.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
+- `Stash-Tailscale-web-UI-Android-app-v1.7.0-source.zip`: clean project source archive.
 - `SHA256SUMS.txt`: SHA-256 checksums for both release artifacts.
 
 ## Phone Setup

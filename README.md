@@ -22,7 +22,7 @@ http://100.102.126.109:9999/
 
 Fresh installs default to Stash's original direct stream. Existing installs keep their saved playback preference during an update.
 
-While a video is open, tap the gear immediately to the left of playback speed to switch between Source, 4K, 1080P, 720P, and 480P. The wrapper keeps the current playback position and play/pause state while changing quality. A manual choice remains active for later videos during the current app session and takes priority over the automatic mobile-playback preference.
+While a video is open, tap the gear immediately to the left of playback speed to switch quality. The menu always includes Source, then only the transcode resolutions at or below that video's source resolution. The wrapper keeps the current playback position and play/pause state while changing quality. A manual choice remains active for later videos during the current app session, capped to each video's source resolution, and takes priority over the automatic mobile-playback preference.
 
 For slower remote connections, open the hidden toolbar, tap Settings, and enable "Prefer mobile playback transcodes." The wrapper selects Stash's native MP4 source directly inside its Video.js player instead of proxying video bytes through Android:
 
@@ -31,6 +31,16 @@ For slower remote connections, open the hidden toolbar, tap Settings, and enable
 ```
 
 The Settings screen can still choose the automatic startup preference. The in-player gear exposes all requested resolutions even when Stash hides higher choices because of its global maximum-transcode setting. If Stash cannot construct a stream for a scene, its normal source remains available. All traffic remains private inside Tailscale.
+
+## Fullscreen and video sizing
+
+The Video.js fullscreen button enters Android immersive fullscreen and hides both system bars until you swipe from an edge or exit fullscreen. The size button immediately to the left of fullscreen offers Fit, Fill / Crop, Zoom 110%, Zoom 125%, and Stretch. The selected size mode remains active for later videos during the current app session.
+
+Each fresh app launch opens the first Scenes page. Login cookies and scene display mode are still retained, but stale pagination and the previously visited detail page are not restored.
+
+## Gallery gestures
+
+Open an image in Stash's lightbox, then swipe left for the next image or right for the previous image. The wrapper only handles deliberate horizontal single-finger swipes inside the lightbox image area; vertical motion, taps, controls, and pinch gestures keep their normal behavior.
 
 Configure Stash's native transcode settings from this project:
 

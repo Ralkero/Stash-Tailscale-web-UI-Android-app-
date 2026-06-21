@@ -19,6 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
@@ -70,9 +71,6 @@ class MainActivity : Activity() {
 
     private val serverUrl: String
         get() = prefs.getString(KEY_SERVER_URL, defaultUrl) ?: defaultUrl
-
-    private val lastUrl: String?
-        get() = prefs.getString(KEY_LAST_URL, null)
 
     private val mobilePlaybackEnabled: Boolean
         get() = prefs.getBoolean(KEY_MOBILE_PLAYBACK_ENABLED, false)
@@ -199,22 +197,62 @@ class MainActivity : Activity() {
     }
 
     private fun configureSystemBars() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         window.statusBarColor = Color.rgb(15, 23, 42)
         window.navigationBarColor = Color.rgb(226, 232, 240)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility =
-                window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-        }
+        var systemUiVisibility = 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            systemUiVisibility = systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        }
+        @Suppress("DEPRECATION")
+        run { window.decorView.systemUiVisibility = systemUiVisibility }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(true)
+            window.insetsController?.show(WindowInsets.Type.systemBars())
+            window.insetsController?.systemBarsBehavior =
+                android.view.WindowInsetsController.BEHAVIOR_DEFAULT
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+            }
+        }
+    }
+
+    private fun enterTrueFullScreen() {
+        root.setPadding(0, 0, 0, 0)
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+            window.insetsController?.hide(WindowInsets.Type.systemBars())
+            window.insetsController?.systemBarsBehavior =
+                android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
             @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility =
-                window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        root.requestApplyInsets()
     }
 
     private fun applySystemBarInsets() {
         root.setOnApplyWindowInsetsListener { _, insets ->
+            if (fullScreenView != null) {
+                root.setPadding(0, 0, 0, 0)
+                return@setOnApplyWindowInsetsListener insets
+            }
             val left: Int
             val top: Int
             val right: Int
@@ -287,7 +325,6 @@ class MainActivity : Activity() {
                 pageProgress.visibility = View.GONE
                 progress.visibility = View.GONE
                 statusText.text = url ?: serverUrl
-                rememberLastUrl(url)
                 syncNavSelection(url)
                 installStashEnhancements()
                 pendingNavigationAction?.takeIf { it.first == navigationGeneration }?.second?.invoke()
@@ -343,6 +380,7 @@ class MainActivity : Activity() {
                 }
                 fullScreenView = view
                 fullScreenCallback = callback
+                view.setBackgroundColor(Color.BLACK)
                 chrome.visibility = View.GONE
                 bottomNav.visibility = View.GONE
                 webView.visibility = View.GONE
@@ -353,6 +391,7 @@ class MainActivity : Activity() {
                         FrameLayout.LayoutParams.MATCH_PARENT
                     )
                 )
+                enterTrueFullScreen()
             }
 
             override fun onHideCustomView() {
@@ -363,9 +402,11 @@ class MainActivity : Activity() {
 
     private fun loadServer() {
         val url = normalizeUrl(serverUrl)
-        prefs.edit().putString(KEY_SERVER_URL, url).apply()
-        val resumeUrl = lastUrl?.takeIf { isAllowedServerUrl(it) && isAllowedInWebView(Uri.parse(it)) }
-        webView.loadUrl(resumeUrl ?: url)
+        prefs.edit()
+            .putString(KEY_SERVER_URL, url)
+            .remove(KEY_LAST_URL)
+            .apply()
+        webView.loadUrl(stashUrl("/scenes"))
     }
 
     private fun checkStatus() {
@@ -495,13 +536,6 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun rememberLastUrl(value: String?) {
-        if (value.isNullOrBlank()) return
-        val uri = Uri.parse(value)
-        if (!isAllowedInWebView(uri)) return
-        prefs.edit().putString(KEY_LAST_URL, value).apply()
-    }
-
     private fun normalizeUrl(value: String): String {
         val trimmed = value.trim()
         val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
@@ -526,9 +560,11 @@ class MainActivity : Activity() {
         fullScreenView = null
         fullScreenCallback?.onCustomViewHidden()
         fullScreenCallback = null
+        configureSystemBars()
         chrome.visibility = if (toolbarVisible) View.VISIBLE else View.GONE
         bottomNav.visibility = View.VISIBLE
         webView.visibility = View.VISIBLE
+        root.requestApplyInsets()
     }
 
     private fun buildBottomNav(): LinearLayout {
@@ -693,6 +729,8 @@ class MainActivity : Activity() {
             append(STASH_NAVIGATION_CHROME_SCRIPT)
             append('\n')
             append(MOBILE_PLAYBACK_SOURCE_SYNC_SCRIPT.replace("__TARGET_RESOLUTION__", JSONObject.quote(resolution)))
+            append('\n')
+            append(LIGHTBOX_SWIPE_SCRIPT)
             append('\n')
             append(SCENE_DISPLAY_MODE_SYNC_SCRIPT)
         }
@@ -1218,16 +1256,67 @@ class MainActivity : Activity() {
                 const state = {
                     targetResolution: targetResolution,
                     applying: false,
-                    manualResolution: null
+                    manualResolution: null,
+                    displayMode: 'FIT'
                 };
 
                 const QUALITY_OPTIONS = [
-                    { value: 'SOURCE', label: 'Source', resolution: null },
-                    { value: 'FOUR_K', label: '4K', resolution: 'FOUR_K' },
-                    { value: 'FULL_HD', label: '1080P', resolution: 'FULL_HD' },
-                    { value: 'STANDARD_HD', label: '720P', resolution: 'STANDARD_HD' },
-                    { value: 'STANDARD', label: '480P', resolution: 'STANDARD' }
+                    { value: 'SOURCE', label: 'Source', resolution: null, minHeight: 0 },
+                    { value: 'FOUR_K', label: '4K', resolution: 'FOUR_K', minHeight: 1920 },
+                    { value: 'FULL_HD', label: '1080P', resolution: 'FULL_HD', minHeight: 1080 },
+                    { value: 'STANDARD_HD', label: '720P', resolution: 'STANDARD_HD', minHeight: 720 },
+                    { value: 'STANDARD', label: '480P', resolution: 'STANDARD', minHeight: 480 }
                 ];
+
+                const DISPLAY_OPTIONS = [
+                    { value: 'FIT', label: 'Fit' },
+                    { value: 'FILL', label: 'Fill / Crop' },
+                    { value: 'ZOOM_110', label: 'Zoom 110%' },
+                    { value: 'ZOOM_125', label: 'Zoom 125%' },
+                    { value: 'STRETCH', label: 'Stretch' }
+                ];
+                try {
+                    const savedDisplayMode = sessionStorage.getItem('stashWrapper.videoDisplayMode');
+                    if (DISPLAY_OPTIONS.some(function(option) { return option.value === savedDisplayMode; })) {
+                        state.displayMode = savedDisplayMode;
+                    }
+                } catch (_) {
+                }
+
+                function sourceHeight() {
+                    const element = document.querySelector(
+                        '.scene-subheader .resolution[data-value], .scene-subheader .resolution'
+                    );
+                    if (!element) return null;
+                    const value = (element.dataset.value || element.textContent || '')
+                        .trim()
+                        .toUpperCase();
+                    if (value === 'HUGE') return Number.MAX_SAFE_INTEGER;
+                    const kMatch = value.match(/^(\d+(?:\.\d+)?)K$/);
+                    if (kMatch) return Number(kMatch[1]) * 1000;
+                    const pMatch = value.match(/^(\d+)P$/);
+                    return pMatch ? Number(pMatch[1]) : null;
+                }
+
+                function availableQualityOptions() {
+                    const height = sourceHeight();
+                    if (!Number.isFinite(height)) return QUALITY_OPTIONS;
+                    return QUALITY_OPTIONS.filter(function(option) {
+                        return option.value === 'SOURCE' || option.minHeight <= height;
+                    });
+                }
+
+                function effectiveQualityOption(requestedValue) {
+                    const requested = QUALITY_OPTIONS.find(function(option) {
+                        return option.value === requestedValue;
+                    }) || QUALITY_OPTIONS[0];
+                    if (requested.value === 'SOURCE') return requested;
+
+                    const available = availableQualityOptions();
+                    return available.find(function(option) {
+                        return option.value !== 'SOURCE' && option.minHeight <= requested.minHeight;
+                    }) || QUALITY_OPTIONS[0];
+                }
 
                 function getPlayer(root) {
                     const video = root && root.querySelector('#VideoJsPlayer, video.video-js');
@@ -1308,12 +1397,120 @@ class MainActivity : Activity() {
                     }
                 }
 
+                function refreshQualityMenu(root) {
+                    if (!root) return;
+                    const availableValues = new Set(availableQualityOptions().map(function(option) {
+                        return option.value;
+                    }));
+                    root.querySelectorAll('.vjs-wrapper-quality-item').forEach(function(item) {
+                        item.hidden = !availableValues.has(item.dataset.quality);
+                    });
+                }
+
                 function closeMenu(root) {
                     const control = root && root.querySelector('.vjs-wrapper-quality');
                     if (!control) return;
                     control.classList.remove('vjs-wrapper-quality-open');
                     const button = control.querySelector('.vjs-wrapper-quality-button');
                     if (button) button.setAttribute('aria-expanded', 'false');
+                }
+
+                function closeDisplayMenu(root) {
+                    const control = root && root.querySelector('.vjs-wrapper-display');
+                    if (!control) return;
+                    control.classList.remove('vjs-wrapper-display-open');
+                    const button = control.querySelector('.vjs-wrapper-display-button');
+                    if (button) button.setAttribute('aria-expanded', 'false');
+                }
+
+                function applyDisplayMode(root, value, remember) {
+                    if (!root) return;
+                    const option = DISPLAY_OPTIONS.find(function(candidate) {
+                        return candidate.value === value;
+                    }) || DISPLAY_OPTIONS[0];
+                    state.displayMode = option.value;
+                    if (remember) {
+                        try {
+                            sessionStorage.setItem('stashWrapper.videoDisplayMode', option.value);
+                        } catch (_) {
+                        }
+                    }
+
+                    const displayClasses = [
+                        'stash-wrapper-display-fit',
+                        'stash-wrapper-display-fill',
+                        'stash-wrapper-display-zoom-110',
+                        'stash-wrapper-display-zoom-125',
+                        'stash-wrapper-display-stretch'
+                    ];
+                    const wantedClass = 'stash-wrapper-display-' +
+                        option.value.toLowerCase().replace('_', '-');
+                    if (!root.classList.contains(wantedClass)) {
+                        root.classList.remove.apply(root.classList, displayClasses);
+                        root.classList.add(wantedClass);
+                    }
+                    root.querySelectorAll('.vjs-wrapper-display-item').forEach(function(item) {
+                        const selected = item.dataset.displayMode === option.value;
+                        item.classList.toggle('vjs-selected', selected);
+                        item.setAttribute('aria-checked', selected ? 'true' : 'false');
+                    });
+                    const button = root.querySelector('.vjs-wrapper-display-button');
+                    if (button) {
+                        button.title = 'Video size: ' + option.label;
+                        button.setAttribute('aria-label', 'Video size: ' + option.label);
+                    }
+                }
+
+                function ensureDisplayMenu(root) {
+                    const controlBar = root && root.querySelector('.vjs-control-bar');
+                    if (!controlBar) return;
+                    let control = controlBar.querySelector('.vjs-wrapper-display');
+                    if (!control) {
+                        control = document.createElement('div');
+                        control.className = 'vjs-wrapper-display vjs-menu-button vjs-control vjs-button';
+                        control.innerHTML = `
+                            <button class="vjs-wrapper-display-button" type="button"
+                                aria-haspopup="true" aria-expanded="false" aria-label="Video size">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4ZM8 8h8v8H8V8Z"/>
+                                </svg>
+                            </button>
+                            <div class="vjs-wrapper-display-menu vjs-menu">
+                                <ul class="vjs-menu-content" role="menu"></ul>
+                            </div>
+                        `;
+                        const menu = control.querySelector('.vjs-menu-content');
+                        DISPLAY_OPTIONS.forEach(function(option) {
+                            const item = document.createElement('li');
+                            item.className = 'vjs-menu-item vjs-wrapper-display-item';
+                            item.dataset.displayMode = option.value;
+                            item.setAttribute('role', 'menuitemradio');
+                            item.setAttribute('aria-checked', 'false');
+                            item.textContent = option.label;
+                            item.addEventListener('click', function(event) {
+                                event.stopPropagation();
+                                applyDisplayMode(root, option.value, true);
+                                closeDisplayMenu(root);
+                            });
+                            menu.appendChild(item);
+                        });
+                        ['touchstart', 'pointerdown', 'mousedown'].forEach(function(eventName) {
+                            control.addEventListener(eventName, function(event) {
+                                event.stopPropagation();
+                            });
+                        });
+                        const button = control.querySelector('.vjs-wrapper-display-button');
+                        control.addEventListener('click', function(event) {
+                            event.stopPropagation();
+                            if (event.target.closest('.vjs-wrapper-display-item')) return;
+                            closeMenu(root);
+                            const open = control.classList.toggle('vjs-wrapper-display-open');
+                            button.setAttribute('aria-expanded', open ? 'true' : 'false');
+                        });
+                        const fullscreen = controlBar.querySelector('.vjs-fullscreen-control');
+                        controlBar.insertBefore(control, fullscreen || null);
+                    }
+                    applyDisplayMode(root, state.displayMode, false);
                 }
 
                 function switchQuality(root, option, remember) {
@@ -1417,6 +1614,8 @@ class MainActivity : Activity() {
                         control.addEventListener('click', function(event) {
                             event.stopPropagation();
                             if (event.target.closest('.vjs-wrapper-quality-item')) return;
+                            closeDisplayMenu(root);
+                            refreshQualityMenu(root);
                             const open = control.classList.toggle('vjs-wrapper-quality-open');
                             button.setAttribute('aria-expanded', open ? 'true' : 'false');
                         });
@@ -1458,12 +1657,57 @@ class MainActivity : Activity() {
                             .vjs-wrapper-quality-menu .vjs-wrapper-quality-item {
                                 cursor: pointer; text-transform: none !important;
                             }
+                            .vjs-wrapper-display { position: relative !important; }
+                            .vjs-wrapper-display-button {
+                                background: transparent; border: 0; color: inherit; cursor: pointer;
+                                height: 100%; margin: 0; padding: 0; width: 100%;
+                            }
+                            .vjs-wrapper-display-button svg {
+                                fill: currentColor; height: 1.75em; vertical-align: middle; width: 1.75em;
+                            }
+                            .vjs-wrapper-display-menu {
+                                bottom: 3em !important; display: none !important; right: 0 !important;
+                                opacity: 0 !important; position: absolute !important;
+                                visibility: hidden !important; width: 9em !important;
+                            }
+                            .vjs-wrapper-display-open .vjs-wrapper-display-menu {
+                                display: block !important; opacity: 1 !important; visibility: visible !important;
+                            }
+                            .vjs-wrapper-display-menu .vjs-menu-content {
+                                display: block !important; max-height: none !important; position: static !important;
+                            }
+                            .vjs-wrapper-display-menu .vjs-wrapper-display-item {
+                                cursor: pointer; text-transform: none !important;
+                            }
+                            .VideoPlayer .vjs-tech {
+                                object-position: center center !important;
+                                transform-origin: center center !important;
+                                transition: transform 120ms ease-out;
+                            }
+                            .VideoPlayer.stash-wrapper-display-fit .vjs-tech {
+                                object-fit: contain !important; transform: none !important;
+                            }
+                            .VideoPlayer.stash-wrapper-display-fill .vjs-tech {
+                                object-fit: cover !important; transform: none !important;
+                            }
+                            .VideoPlayer.stash-wrapper-display-zoom-110 .vjs-tech {
+                                object-fit: contain !important; transform: scale(1.10) !important;
+                            }
+                            .VideoPlayer.stash-wrapper-display-zoom-125 .vjs-tech {
+                                object-fit: contain !important; transform: scale(1.25) !important;
+                            }
+                            .VideoPlayer.stash-wrapper-display-stretch .vjs-tech {
+                                object-fit: fill !important; transform: none !important;
+                            }
                         `;
                         document.head.appendChild(style);
                     }
 
+                    refreshQualityMenu(root);
+                    ensureDisplayMenu(root);
+
                     if (state.manualResolution) {
-                        markSelected(root, state.manualResolution);
+                        markSelected(root, effectiveQualityOption(state.manualResolution).value);
                     } else {
                         const player = getPlayer(root);
                         const current = player && typeof player.currentSource === 'function'
@@ -1516,18 +1760,16 @@ class MainActivity : Activity() {
 
                     if (state.manualResolution) {
                         const player = getPlayer(root);
+                        const option = effectiveQualityOption(state.manualResolution);
                         const current = player && typeof player.currentSource === 'function'
                             ? player.currentSource()
                             : null;
                         const currentResolution = current && sourceResolution(current);
-                        const alreadySelected = state.manualResolution === 'SOURCE'
+                        const alreadySelected = option.value === 'SOURCE'
                             ? !currentResolution || currentResolution === 'ORIGINAL'
-                            : currentResolution === state.manualResolution;
+                            : currentResolution === option.value;
                         if (!alreadySelected) {
-                            const option = QUALITY_OPTIONS.find(function(candidate) {
-                                return candidate.value === state.manualResolution;
-                            });
-                            if (option) switchQuality(root, option, false);
+                            switchQuality(root, option, false);
                         }
                         return;
                     }
@@ -1733,6 +1975,89 @@ class MainActivity : Activity() {
                 return true;
             })();
         """.trimIndent()
+
+        private val LIGHTBOX_SWIPE_SCRIPT = """
+            (function() {
+                const wrapper = window.__stashWrapper;
+                if (!wrapper) return false;
+                if (wrapper.lightboxSwipe) return true;
+
+                const state = { gesture: null };
+
+                function lightboxDisplayFor(target) {
+                    if (!target || !target.closest) return null;
+                    if (target.closest('button, a, input, select, textarea, [role="button"]')) {
+                        return null;
+                    }
+                    const display = target.closest('.Lightbox-display');
+                    return display && display.closest('.Lightbox') ? display : null;
+                }
+
+                function onTouchStart(event) {
+                    if (event.touches.length !== 1) {
+                        state.gesture = null;
+                        return;
+                    }
+                    const display = lightboxDisplayFor(event.target);
+                    if (!display) {
+                        state.gesture = null;
+                        return;
+                    }
+                    const touch = event.touches[0];
+                    state.gesture = {
+                        display: display,
+                        startX: touch.clientX,
+                        startY: touch.clientY,
+                        lastX: touch.clientX,
+                        lastY: touch.clientY,
+                        startedAt: Date.now()
+                    };
+                }
+
+                function onTouchMove(event) {
+                    const gesture = state.gesture;
+                    if (!gesture || event.touches.length !== 1) return;
+                    const touch = event.touches[0];
+                    gesture.lastX = touch.clientX;
+                    gesture.lastY = touch.clientY;
+                }
+
+                function onTouchEnd(event) {
+                    const gesture = state.gesture;
+                    state.gesture = null;
+                    if (!gesture || !gesture.display.isConnected) return;
+                    const touch = event.changedTouches && event.changedTouches[0];
+                    const endX = touch ? touch.clientX : gesture.lastX;
+                    const endY = touch ? touch.clientY : gesture.lastY;
+                    const deltaX = endX - gesture.startX;
+                    const deltaY = endY - gesture.startY;
+                    const distance = Math.abs(deltaX);
+                    const minimumDistance = Math.max(60, Math.min(window.innerWidth * 0.14, 120));
+                    if (Date.now() - gesture.startedAt > 1200) return;
+                    if (distance < minimumDistance || distance <= Math.abs(deltaY) * 1.35) return;
+
+                    const key = deltaX < 0 ? 'ArrowRight' : 'ArrowLeft';
+                    document.dispatchEvent(new KeyboardEvent('keydown', {
+                        key: key,
+                        code: key,
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                }
+
+                function cancelGesture() {
+                    state.gesture = null;
+                }
+
+                document.addEventListener('touchstart', onTouchStart, { capture: true, passive: true });
+                document.addEventListener('touchmove', onTouchMove, { capture: true, passive: true });
+                document.addEventListener('touchend', onTouchEnd, { capture: true, passive: true });
+                document.addEventListener('touchcancel', cancelGesture, { capture: true, passive: true });
+                wrapper.lightboxSwipe = state;
+                return true;
+            })();
+        """.trimIndent()
+
         private val SEARCH_FOCUS_SCRIPT = """
             (function() {
                 const selectors = [
