@@ -1,6 +1,14 @@
-# Stash Tailscale Web UI Android App v1.7.0
+# Stash Tailscale Web UI Android App v1.8.0
 
 Private Android WebView wrapper for accessing Stash through Tailscale.
+
+## v1.8.0 Audio Mini-Player Update
+
+- Adds a compact bottom mini-player when a Stash native audio item starts playing.
+- Shows cover art, title, author/subtitle text, current time, duration, scrubber, play/pause, 10-second skip controls, playback speed, and close.
+- Attaches to Stash's existing WaveSurfer-backed audio element while the audio detail page is open.
+- Migrates active playback to a hidden WebView audio element before SPA route changes so audio continues while browsing.
+- Keeps video playback controls, Tailscale-only networking, authentication, and Android permissions unchanged.
 
 ## v1.7.0 Fullscreen and Startup Update
 
@@ -84,8 +92,8 @@ Private Android WebView wrapper for accessing Stash through Tailscale.
 
 ## Artifacts
 
-- `Stash-Wrapper-v1.7.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
-- `Stash-Tailscale-web-UI-Android-app-v1.7.0-source.zip`: clean project source archive.
+- `Stash-Wrapper-v1.8.0.apk`: R8-optimized APK signed for seamless updates from earlier versions.
+- `Stash-Tailscale-web-UI-Android-app-v1.8.0-source.zip`: clean project source archive.
 - `SHA256SUMS.txt`: SHA-256 checksums for both release artifacts.
 
 ## Phone Setup

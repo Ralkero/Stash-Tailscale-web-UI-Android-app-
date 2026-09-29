@@ -42,6 +42,12 @@ Each fresh app launch opens the first Scenes page. Login cookies and scene displ
 
 Open an image in Stash's lightbox, then swipe left for the next image or right for the previous image. The wrapper only handles deliberate horizontal single-finger swipes inside the lightbox image area; vertical motion, taps, controls, and pinch gestures keep their normal behavior.
 
+## Audio mini-player
+
+When a Stash native audio item starts playing, the wrapper shows a compact bottom mini-player with cover art, title, author text, scrubber, play/pause, 10-second skip controls, speed, and close.
+
+The mini-player attaches to Stash's existing WaveSurfer-backed HTML audio element while you are on the audio detail page. Before SPA navigation tears that page down, it migrates the current stream into a hidden WebView audio element so playback and the mini-player can continue while you browse.
+
 Configure Stash's native transcode settings from this project:
 
 ```powershell

@@ -1,5 +1,18 @@
 # Stash Tailscale Web UI Android App Release Artifacts
 
+## v1.8.0
+
+- APK: `Stash-Wrapper-v1.8.0.apk`
+- Source: `Stash-Tailscale-web-UI-Android-app-v1.8.0-source.zip`
+- Checksums: `SHA256SUMS.txt`
+
+```text
+7c1730a127d7ffd260c996f9fb1d22aa083d5d7b677159098d610a22add558de  Stash-Wrapper-v1.8.0.apk
+7466b447fd8dbb77a628530b7d2685cf926927cef508afd43f1210760ac1ee17  Stash-Tailscale-web-UI-Android-app-v1.8.0-source.zip
+```
+
+This update adds a compact audio mini-player that appears when Stash native audio starts playing, controls the existing WaveSurfer-backed audio element, and keeps playback alive during SPA browsing by migrating active streams before route changes.
+
 ## v1.5.0
 
 - APK: `Stash-Wrapper-v1.5.0.apk`
